@@ -24,7 +24,7 @@ Hs_inter =  4*(ds.SPEC_new.integrate("freq_new"))**0.5
 # maximum Hs
 max_Hs = Hs_heave.where(Hs_heave==Hs_heave.max(),drop=True).squeeze()
 
-# Plot Spec1D for given time step
+# Plot Spec1D for time with  max-Hs
 plt.figure()
 plt.plot(ds.freq_raw, ds.SPEC_raw.loc[max_Hs.time],color='grey',label='Raw-Spec, Hm0[m]:'+str(Hs_raw.loc[max_Hs.time].values.round(2))+',4*std(heave)[m]:'+str(Hs_heave.loc[max_Hs.time].values.round(2)))
 plt.plot(ds.freq_new, ds.SPEC_new.loc[max_Hs.time],color='red',label='Interpol.-Raw-Spec., Hm0[m]:'+str(Hs_inter.loc[max_Hs.time].values.round(2)))

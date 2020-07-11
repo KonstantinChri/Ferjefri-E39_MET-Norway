@@ -1,3 +1,5 @@
+
+ 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import numpy as np
@@ -6,14 +8,15 @@ import spectres as spec
 import xarray as xr
 
 
-def heave_to_spec1D(heave,freq_new, detrend):
+def heave_to_spec1D(heave,freq_new,sample_frequency, detrend):
     ''' -estimates SPEC_raw[time,freq_raw] from heave[time,samples]
         -resample SPEC_raw[time,freq_raw] to SPEC_new[time,freq_new]
-         freq_new: 1D array - new frequency grid
+        -freq_new: 1D array - new frequency grid
+        -sample_frequency [Hz]: Svinøy: 1Hz and A-F: 2Hz
     '''
     n = np.zeros(heave.shape)
     index_nan = []
-    freq_raw = np.fft.rfftfreq(heave.shape[1],d=1)
+    freq_raw = np.fft.rfftfreq(heave.shape[1],d=1./sample_frequency)
     if detrend == True:
         for i in range(heave.shape[0]):
             if np.isnan(heave[i,:]).all() ==True:
@@ -24,7 +27,7 @@ def heave_to_spec1D(heave,freq_new, detrend):
     else:
         n = heave
     # fft: heave to SPEC_raw
-    SPEC_raw = np.abs(np.fft.rfft(n,axis=1))**2 / len(freq_raw) 
+    SPEC_raw = np.abs(np.fft.rfft(n,axis=1))**2 / (sample_frequency*len(freq_raw))
     # resample SPEC_raw to a new frequency grid 
     SPEC_new = spec.spectres(freq_new, freq_raw, SPEC_raw, spec_errs=None, fill=None, verbose=True) # resample
     SPEC_raw[index_nan,:] = np.nan #  time_index where heave is nan
@@ -39,3 +42,10 @@ def heave_to_spec1D(heave,freq_new, detrend):
                                 coords = {'time': heave.time,'freq_new':freq_new},
                                 attrs  = {'units': 'm**2 s'})})
     return ds  
+
+
+
+
+
+
+

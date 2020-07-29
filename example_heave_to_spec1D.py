@@ -14,7 +14,7 @@ ds_raw = xr.open_dataset('https://thredds.met.no/thredds/dodsC/obs/buoy-svv-e39/
 # Provide the frequency grid
 freq_new = np.arange(0.04,0.50,0.01)
 # Call heave_to_spec1D function
-ds = heave_to_spec1D(ds_raw.heave,freq_new,sample_frequency=1, detrend = True, window=True)
+ds = heave_to_spec1D(ds_raw.heave,freq_new,sample_frequency=1, detrend = True, window=False)
 
 # different estimations of Hs for plotting
 Hs_heave =  4*np.std(ds_raw.heave,axis=1)

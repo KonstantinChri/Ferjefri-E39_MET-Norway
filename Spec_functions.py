@@ -12,8 +12,8 @@ def heave_to_spec1D(heave,freq_new,sample_frequency, detrend, window):
     (heave)
     Parameters:
     ----------
-    heave : 2D array containing surface eleavation [time,samples]
-    freq_new : 1D array containing the desired frequency grid
+    heave : Array containing surface eleavation [time,samples]
+    freq_new : Array containing the desired frequency grid
     sample_frequency: value in Hz e.g. for Svinøy is 1 Hz, A-F is 2 Hz
     detrend : bool (if True, it uses a linear detrend)
     window  : bool (if True, it uses hanning window in fft)
@@ -59,6 +59,32 @@ def heave_to_spec1D(heave,freq_new,sample_frequency, detrend, window):
 
 
 
+def heave_to_welch_spec1D(heave,freq_resolution,sample_frequency, detrend_str, window_str):
+    """
+    Function for estimation of frequency spectra from sea surface elevation
+    using the Welch method
+    Parameters:
+    ----------
+    heave : Array containing surface eleavation [time,samples]
+    freq_resolution : desired resolution of frequencies in Hz, common used 0.01Hz
+    sample_frequency: value in Hz e.g. for Svinøy is 1 Hz, A-F is 2 Hz
+    detrend_str : str e.g. 'constant'
+    window_str  : str e.g. 'hann'
+   Returns
+   -------
+    ds : xr.Dataset
+        freq: Array of frequencies
+        SPEC[time,freq_raw]: Spectra array
+    """
+    freq, SPEC =  signal.welch(heave, fs=sample_frequency, window=window_str,
+                               nperseg=sample_frequency/freq_resolution, 
+                               noverlap=0.5*(sample_frequency/freq_resolution), 
+                          nfft=None, detrend=detrend_str, return_onesided=True, 
+                          scaling='density', axis=-1)
+    
 
-
-
+    ds = xr.Dataset({'SPEC': xr.DataArray(SPEC, 
+                                dims   = ['time','freq'],
+                                coords = {'time': heave.time,'freq':freq},
+                                attrs  = {'units': 'm**2 s'})})
+    return ds  

@@ -2,11 +2,9 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from scipy import signal
-import spectres as spec
 import xarray as xr
 
-
-def heave_to_spec1D(heave,freq_new,sample_frequency, detrend, window):
+def Heave_to_RawSpec1D(heave,freq_new,sample_frequency, detrend, window):
     """
     Function for estimation of frequency spectra from sea surface elevation 
     (heave)
@@ -42,24 +40,16 @@ def heave_to_spec1D(heave,freq_new,sample_frequency, detrend, window):
     else:
         # fft - without window
         SPEC_raw =   np.abs(np.fft.rfft(n,axis=1))**2  /  (sample_frequency*len(freq_raw))
-    # resample SPEC_raw to a new frequency grid 
-    SPEC_new = spec.spectres(freq_new, freq_raw, SPEC_raw, spec_errs=None, fill=None, verbose=True) # resample
     SPEC_raw[index_nan,:] = np.nan #  time_index where heave is nan
-    SPEC_new[index_nan,:] = np.nan #  time_index where heave is nan    
     # create xarray output
     ds = xr.Dataset({'SPEC_raw': xr.DataArray(SPEC_raw,
                                 dims   = ['time','freq_raw'],
                                 coords = {'time': heave.time,'freq_raw':freq_raw},
-                                attrs  = {'units': 'm**2 s'}),
-                     'SPEC_new': xr.DataArray(SPEC_new, 
-                                dims   = ['time','freq_new'],
-                                coords = {'time': heave.time,'freq_new':freq_new},
                                 attrs  = {'units': 'm**2 s'})})
     return ds  
 
 
-
-def heave_to_welch_spec1D(heave,freq_resolution,sample_frequency, detrend_str, window_str):
+def Heave_to_WelchSpec1D(heave,freq_resolution,sample_frequency, detrend_str, window_str):
     """
     Function for estimation of frequency spectra from sea surface elevation
     using the Welch method
@@ -76,6 +66,8 @@ def heave_to_welch_spec1D(heave,freq_resolution,sample_frequency, detrend_str, w
         freq: Array of frequencies
         SPEC[time,freq_raw]: Spectra array
     """
+    #sampling_time = 600#(heave.time[1]-heave.time[0])/np.timedelta64(1, 's') # in seconds
+    # sampling frequency len(heave.samples/sampling_time)
     freq, SPEC =  signal.welch(heave, fs=sample_frequency, window=window_str,
                                nperseg=sample_frequency/freq_resolution, 
                                noverlap=0.5*(sample_frequency/freq_resolution), 
@@ -88,3 +80,5 @@ def heave_to_welch_spec1D(heave,freq_resolution,sample_frequency, detrend_str, w
                                 coords = {'time': heave.time,'freq':freq},
                                 attrs  = {'units': 'm**2 s'})})
     return ds  
+
+

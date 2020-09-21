@@ -8,7 +8,7 @@ fjord = 'Sulafjorden' # Sulafjorden / Breisundet etc
 variable = 'aquadopp' # wave / wind / aquadopp
 start_date = '2016-10-01 00:00:00'
 end_date = '2020-07-30 00:00:00'
-dir_for_download = '/home/konstantinosc/PhD/Paper_Norkyst/Data/Raw_Spec/all_files/'+buoy+'/'+variable+'/'
+dir_for_download = '.../'+buoy+'/'+variable+'/'
 
 
 dates = pd.period_range(start_date,end_date, freq="M")

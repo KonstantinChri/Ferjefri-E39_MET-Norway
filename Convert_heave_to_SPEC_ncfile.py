@@ -4,8 +4,8 @@ import numpy as np
 import xarray as xr
 from Spec_functions import Heave_to_WelchSpec1D
 
-# This program convert raw heave data from thredds.met.no/thredds/
-# to spectra and then save it to a netcdf file
+# This program converts raw heave data (file_in) from thredds.met.no/thredds/
+# to spectra and then saves it to a netcdf file (file_out)
 
 # Provide raw wave data from thredds.met.no/thredds/:
 file_in = 'https://thredds.met.no/thredds/dodsC/obs/buoy-svv-e39/2020/01/202001_E39_C_Sulafjorden_raw_wave.nc'

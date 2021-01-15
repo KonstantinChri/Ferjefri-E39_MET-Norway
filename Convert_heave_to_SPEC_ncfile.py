@@ -22,6 +22,6 @@ ds_welch = Heave_to_WelchSpec1D(ds_raw.heave,
                                  detrend_str='constant', window_str='hann')
 
 # save spectra data to netcdf 
-file_out = file_in.split('/')[-1].replace('raw','SPEC')
+file_out = file_in.split('/')[-1].replace('raw','SPEC') # nc-file to save spectra
 ds_welch.to_netcdf(file_out)
 

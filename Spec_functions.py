@@ -98,7 +98,8 @@ def Heave_to_Coherence(heave1,heave2,freq_resolution,sample_frequency, detrend_s
         freq: Array of frequencies
         Coh[time,freq_raw]: Coherence array
     """
-    freq, Coh = signal.coherence(heave1,heave2,
+    ds0 = xr.merge([heave1.rename('heave1'),heave2.rename('heave2')],compat='override', join='inner')
+    freq, Coh = signal.coherence(ds0.heave1,ds0.heave2,
                                   fs = sample_frequency,
                                   nperseg=sample_frequency/freq_resolution,
                                   noverlap=0.5*(sample_frequency/freq_resolution),
@@ -107,6 +108,37 @@ def Heave_to_Coherence(heave1,heave2,freq_resolution,sample_frequency, detrend_s
 
     ds = xr.Dataset({'Coh': xr.DataArray(Coh,
                                 dims   = ['time','freq'],
-                                coords = {'time': heave1.time,'freq':freq},
+                                coords = {'time': ds0.time,'freq':freq},
+                                attrs  = {'units': '-'})})
+    return ds
+
+
+def Heave_to_CSD(heave1,heave2,freq_resolution,sample_frequency, detrend_str, window_str):
+    """
+    Function for estimation of Cross Spectral Density from sea surface elevation
+    Parameters:
+    ----------
+    heave : Array containing surface eleavation 1 [time,samples]
+    freq_resolution : desired resolution of frequencies in Hz, common used 0.01Hz
+    sample_frequency: value in Hz e.g. for Svinøy is 1 Hz, A-F is 2 Hz
+    detrend_str : str e.g. 'constant'
+    window_str  : str e.g. 'hann'
+   Returns
+   -------
+    ds : xr.Dataset
+        freq: Array of frequencies
+        CSD[time,freq_raw]: Cross Spectral Density array
+    """
+    ds0 = xr.merge([heave1.rename('heave1'),heave2.rename('heave2')],compat='override', join='inner')
+    freq, CSD = signal.csd(ds0.heave1,ds0.heave2,
+                                  fs = sample_frequency,
+                                  nperseg=sample_frequency/freq_resolution,
+                                  noverlap=0.5*(sample_frequency/freq_resolution),
+                                   nfft=None, detrend=detrend_str, window=window_str,
+                                   axis=-1)
+
+    ds = xr.Dataset({'CSD': xr.DataArray(CSD,
+                                dims   = ['time','freq'],
+                                coords = {'time': ds0.time,'freq':freq},
                                 attrs  = {'units': 'm**2 s'})})
     return ds

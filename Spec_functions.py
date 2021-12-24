@@ -6,7 +6,7 @@ import xarray as xr
 
 def Heave_to_RawSpec1D(heave,freq_new,sample_frequency, detrend, window):
     """
-    Function for estimation of frequency spectra from sea surface elevation 
+    Function for estimation of frequency spectra from sea surface elevation
     (heave)
     Parameters:
     ----------
@@ -46,7 +46,7 @@ def Heave_to_RawSpec1D(heave,freq_new,sample_frequency, detrend, window):
                                 dims   = ['time','freq_raw'],
                                 coords = {'time': heave.time,'freq_raw':freq_raw},
                                 attrs  = {'units': 'm**2 s'})})
-    return ds  
+    return ds
 
 
 def Heave_to_WelchSpec1D(heave,freq_resolution,sample_frequency, detrend_str, window_str):
@@ -69,16 +69,44 @@ def Heave_to_WelchSpec1D(heave,freq_resolution,sample_frequency, detrend_str, wi
     #sampling_time = 600#(heave.time[1]-heave.time[0])/np.timedelta64(1, 's') # in seconds
     # sampling frequency len(heave.samples/sampling_time)
     freq, SPEC =  signal.welch(heave, fs=sample_frequency, window=window_str,
-                               nperseg=sample_frequency/freq_resolution, 
-                               noverlap=0.5*(sample_frequency/freq_resolution), 
-                          nfft=None, detrend=detrend_str, return_onesided=True, 
+                               nperseg=sample_frequency/freq_resolution,
+                               noverlap=0.5*(sample_frequency/freq_resolution),
+                          nfft=None, detrend=detrend_str, return_onesided=True,
                           scaling='density', axis=-1)
-    
 
-    ds = xr.Dataset({'SPEC': xr.DataArray(SPEC, 
+
+    ds = xr.Dataset({'SPEC': xr.DataArray(SPEC,
                                 dims   = ['time','freq'],
                                 coords = {'time': heave.time,'freq':freq},
                                 attrs  = {'units': 'm**2 s'})})
-    return ds  
+    return ds
 
+def Heave_to_Coherence(heave1,heave2,freq_resolution,sample_frequency, detrend_str, window_str):
+    """
+    Function for estimation of coherence from 2 sea surface elevation time series
+    Parameters:
+    ----------
+    heave1 : Array containing surface eleavation 1 [time,samples]
+    heave1 : Array containing surface eleavation 2 [time,samples]
+    freq_resolution : desired resolution of frequencies in Hz, common used 0.01Hz
+    sample_frequency: value in Hz e.g. for Svinøy is 1 Hz, A-F is 2 Hz
+    detrend_str : str e.g. 'constant'
+    window_str  : str e.g. 'hann'
+   Returns
+   -------
+    ds : xr.Dataset
+        freq: Array of frequencies
+        Coh[time,freq_raw]: Coherence array
+    """
+    freq, Coh = signal.coherence(heave1,heave2,
+                                  fs = sample_frequency,
+                                  nperseg=sample_frequency/freq_resolution,
+                                  noverlap=0.5*(sample_frequency/freq_resolution),
+                                   nfft=None, detrend=detrend_str, window=window_str,
+                                   axis=-1)
 
+    ds = xr.Dataset({'Coh': xr.DataArray(Coh,
+                                dims   = ['time','freq'],
+                                coords = {'time': heave1.time,'freq':freq},
+                                attrs  = {'units': 'm**2 s'})})
+    return ds

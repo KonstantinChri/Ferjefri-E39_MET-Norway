@@ -3,6 +3,10 @@
 import numpy as np
 from scipy import signal
 import xarray as xr
+from urllib.request import urlretrieve
+import pandas as pd
+from nco import Nco
+
 
 def Heave_to_RawSpec1D(heave,freq_new,sample_frequency, detrend, window):
     """
@@ -142,3 +146,39 @@ def Heave_to_CSD(heave1,heave2,freq_resolution,sample_frequency, detrend_str, wi
                                 coords = {'time': ds0.time,'freq':freq},
                                 attrs  = {'units': 'm**2 s'})})
     return ds
+
+
+
+def download_E39_obs(start_date,end_date,buoy,fjord,variable):
+    """
+    Extract times series of  the nearest gird point (lon,lat) from 
+    nora3 wave hindcast and save it as netcdf.
+    """
+    nco = Nco()
+    date_list = pd.date_range(start=start_date , end=end_date, freq='MS')
+    outfile = date_list.strftime('%Y%m')[0]+'_'+date_list.strftime('%Y%m')[-1]+'_E39_'+buoy+'_'+fjord+'_'+variable+'.nc'
+    
+    if os.path.exists(outfile):
+        os.remove(outfile)
+        print(outfile, 'already exists, so it will be deleted and create a new....')
+    
+    else:
+        print("....")
+    
+    
+    infile = [None] *len(date_list)  
+    # extract point and create temp files
+    for i in range(len(date_list)):
+        #infile[i] = 'https://thredds.met.no/thredds/dodsC/obs/buoy-svv-e39/'+date_list.strftime('%Y')[i] + '/' + date_list.strftime('%m')[i] + '/'+ date_list.strftime('%Y')[i] +date_list.strftime('%m')[i] + '_E39_'+buoy +'_'+fjord+'_'+variable +'.nc'
+        url = 'https://thredds.met.no/thredds/fileServer/obs/buoy-svv-e39/'+date_list.strftime('%Y')[i] + '/' + date_list.strftime('%m')[i] + '/'+ date_list.strftime('%Y')[i] +date_list.strftime('%m')[i] + '_E39_'+buoy +'_'+fjord+'_'+variable +'.nc'  
+        infile[i] = date_list.strftime('%Y')[i] +date_list.strftime('%m')[i] + '_E39_'+buoy +'_'+fjord+'_'+variable +'.nc'
+        urlretrieve(url,infile[i])
+    print(infile)
+    #merge temp files
+    nco.ncrcat(input=infile, output=outfile)
+    
+    #remove temp files
+    for i in range(len(date_list)):
+        os.remove(infile[i])
+        
+    return

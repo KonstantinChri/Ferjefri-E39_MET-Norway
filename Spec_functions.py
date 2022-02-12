@@ -141,11 +141,12 @@ def Heave_to_CSD(heave1,heave2,freq_resolution,sample_frequency, detrend_str, wi
                                   noverlap=0.5*(sample_frequency/freq_resolution),
                                    nfft=None, detrend=detrend_str, window=window_str,
                                    axis=-1)
-
+    
     ds = xr.Dataset({'CSD': xr.DataArray(CSD,
-                                dims   = ['time','freq'],
-                                coords = {'time': ds0.time,'freq':freq},
+                                dims   = ['time','frequency'],
+                                coords = {'time': ds0.time,'frequency':freq},
                                 attrs  = {'units': 'm**2 s'})})
+    ds['frequency'].attrs["units"] = '1/s'
     return ds
 
 
@@ -182,3 +183,116 @@ def download_E39_obs(start_date,end_date,buoy,fjord,variable):
         os.remove(infile[i])
 
     return
+
+def MEM(n_direction,a1, b1, a2, b2):
+    """ The function generates a Maximum entropy directional density matrix
+    n_direction: number of directions.
+    a1 b1 a2 b2: are the fourier coefficients size(time,frequency) """
+   
+    n_freq = len(a1.frequency)
+    n_time = len(a1.time)
+    direction = np.linspace(0,2*np.pi,n_direction) # range 0...2pi
+    direction = np.mod(3*np.pi/2-direction,2*np.pi)  #Rotate to oceanographic dir.
+    d = xr.DataArray(np.zeros((n_time, n_freq, n_direction)),
+    dims=["time", "frequency", "direction"],
+    coords={"time": a1.time, "frequency": a1.frequency, "direction": direction})
+    direction  = xr.DataArray(direction,dims=["direction"])
+    
+    for nn in range(0,n_freq):
+        c1 = a1[:,nn]+1j*b1[:,nn]
+        c2 = a2[:,nn]+1j*b2[:,nn] 
+        f1 = ( c1 - c2*np.conj(c1) )/(1-np.abs(c1)**2)
+        f2 = c2 -c1*f1
+        s1 = 1 - f1*np.conj(c1) - f2*np.conj(c2)
+        den= 1 - f1*np.exp(-1j*direction) - f2*np.exp(-2j*direction)
+        d[:,nn,:]  = np.abs(np.real((1/2*np.pi)*((s1/(np.abs(den)**2) ))))
+    
+    d['direction'] = np.round(np.linspace(0,360,n_direction),0) # ocean. dir.
+    d['direction'].attrs["units"] = 'degrees'
+    
+    d = d/((2*90/np.pi)*2)
+    return d
+
+
+def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequency):
+    """
+    Function for estimation of directional spectra(frequency,direction) 
+    from heave, pitch and roll (tested for Wavescan buoys)
+    Parameters:
+    ----------
+    raw_data : Xarray dataset containing variables:
+        heave(time,samples) in meters, pitch(time,samples) in degress,
+        roll(time,samples) in degress and compass(time,samples) in degrees 
+    freq_resolution : desired resolution of frequencies in Hz, common used 0.01Hz
+    sample_frequency: value in Hz e.g., for Svinøy buoy is 1 Hz, A-F is 2 Hz
+    Returns
+    -------
+    ds : xr.Dataset
+        frequency: Array of frequencies [1/s]
+        direction: Array of directions [degrees]
+        SPEC[time,frequency,direction]: Spectra array [m**2 s]
+    """
+    R = np.deg2rad(raw_data['roll'])
+    P = np.deg2rad(raw_data['pitch'])
+    Z = raw_data['heave']
+    A = np.deg2rad(raw_data['compass'])
+    
+    # Estimate slopes (east-west and north/south):
+    Zy = ((np.sin(P)/np.cos(P))*np.sin(A)) + (np.sin(R)/(np.cos(P)*np.cos(R))*np.cos(A))
+    Zx = ((np.sin(P)/np.cos(P))*np.cos(A)) - (np.sin(R)/(np.cos(P)*np.cos(R))*np.sin(A))  
+    
+    
+    # Estimate Quadrature Spectra Q:
+    Qzx =  np.imag(Heave_to_CSD(Z , Zx ,
+                                     freq_resolution=freq_resolution,
+                                     sample_frequency=1, 
+                                     detrend_str=False, window_str='hann')['CSD'])    
+    Qzy =  np.imag(Heave_to_CSD(Z , Zy,
+                                     freq_resolution=freq_resolution,
+                                     sample_frequency=1, 
+                                     detrend_str=False, window_str='hann')['CSD'])
+   #Estimate Cross Spectra C:    
+    Cyy =  np.real(Heave_to_CSD(Zy , Zy,
+                                     freq_resolution=freq_resolution,
+                                     sample_frequency=1, 
+                                     detrend_str=False, window_str='hann')['CSD'])
+    
+    Cxx =  np.real(Heave_to_CSD(Zx , Zx,
+                                     freq_resolution=freq_resolution,
+                                     sample_frequency=1, 
+                                     detrend_str=False, window_str='hann')['CSD'])
+    
+    Cxy =  np.real(Heave_to_CSD(Zx , Zy,
+                                      freq_resolution=freq_resolution,
+                                      sample_frequency=1, 
+                                      detrend_str=False, window_str='hann')['CSD'])              
+    
+    
+    Czz =  np.real(Heave_to_CSD(Z , Z,
+                                      freq_resolution=freq_resolution,
+                                      sample_frequency=1, 
+                                      detrend_str=False, window_str='hann')['CSD'])  
+    
+    # Estimate Wavenumber using cross spectra    
+    k = np.sqrt( (Cxx+Cyy)/Czz )
+ 
+    #Estimate first 4 Fourier Coefficients:
+    a1 = Qzy/(k*Czz)
+    b1 = Qzx/(k*Czz)
+    
+    a2 = (Cyy - Cxx)/(Czz*k*k)
+    b2 = 2*Cxy/(Czz*k*k) 
+    
+    # Use Max. Entropy Method:    
+    D = MEM(n_direction = n_direction, a1 = a1,b1 = b1,a2 = a2,b2 = b2)
+    
+    SPEC2D = Czz * D 
+
+
+    ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
+                                dims   = ['time','frequency','direction'],
+                                coords = {'time': SPEC2D.time,'frequency':SPEC2D.frequency, 'direction':SPEC2D.direction},
+                                attrs  = {'units': 'm**2 s'})})
+    return ds
+
+

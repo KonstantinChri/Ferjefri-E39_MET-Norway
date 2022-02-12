@@ -6,20 +6,20 @@ import xarray as xr
 from Spec_functions import Heave_to_RawSpec1D, Heave_to_WelchSpec1D
 
 # Provide raw wave data from thredds.met.no/thredds/
-ds_raw = xr.open_dataset('https://thredds.met.no/thredds/dodsC/obs/buoy-svv-e39/2020/01/202001_E39_Svinoy_raw_wave.nc')
+#ds_raw = xr.open_dataset('https://thredds.met.no/thredds/dodsC/obs/buoy-svv-e39/2020/01/202001_E39_Svinoy_raw_wave.nc')
 #ds_raw = xr.open_dataset('https://thredds.met.no/thredds/dodsC/obs/buoy-svv-e39/2017/11/201711_E39_F_Vartdalsfjorden_raw_wave.nc')
-#ds_raw = xr.open_dataset('https://thredds.met.no/thredds/dodsC/obs/buoy-svv-e39/2020/01/202001_E39_C_Sulafjorden_raw_wave.nc')
+ds_raw = xr.open_dataset('https://thredds.met.no/thredds/dodsC/obs/buoy-svv-e39/2020/01/202001_E39_C_Sulafjorden_raw_wave.nc')
 
 # Provide the frequency grid
 freq_resolution = 0.01
 freq_new = np.arange(0.04,1,freq_resolution)
 
 # Use a resampling method
-ds = Heave_to_RawSpec1D(ds_raw.heave,freq_new,sample_frequency=1, detrend = True, window=True)
+ds = Heave_to_RawSpec1D(ds_raw.heave,freq_new,sample_frequency=2, detrend = True, window=True)
 # Using Welch method
 ds_welch = Heave_to_WelchSpec1D(ds_raw.heave,
                                  freq_resolution=freq_resolution,
-                                 sample_frequency=1, 
+                                 sample_frequency=2, 
                                  detrend_str='constant', window_str='hann')
 
 # different estimations of Hs for plotting

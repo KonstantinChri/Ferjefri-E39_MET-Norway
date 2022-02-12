@@ -270,8 +270,7 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
                                       freq_resolution=freq_resolution,
                                       sample_frequency=1, 
                                       detrend_str=False, window_str='hann')['CSD'])              
-    
-    
+      
     Czz =  np.real(Heave_to_CSD(Z , Z,
                                       freq_resolution=freq_resolution,
                                       sample_frequency=1, 
@@ -291,7 +290,6 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     D = MEM(n_direction = n_direction, a1 = a1,b1 = b1,a2 = a2,b2 = b2)
     
     SPEC2D = Czz * D 
-
 
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
                                 dims   = ['time','frequency','direction'],

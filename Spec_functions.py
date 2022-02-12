@@ -241,6 +241,9 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     Zy = ((np.sin(P)/np.cos(P))*np.sin(A)) + (np.sin(R)/(np.cos(P)*np.cos(R))*np.cos(A))
     Zx = ((np.sin(P)/np.cos(P))*np.cos(A)) - (np.sin(R)/(np.cos(P)*np.cos(R))*np.sin(A))  
     
+    # More details about the methodology can be found:
+    # Longuet-Higgins et al (1963) , P.N. Ananth et al. (1992), F. P. Brissette et al. (1994) 
+    # Nondirectional and Directional Wave Data Analysis Procedures,  NDBC Technical Document 96-01
     
     # Estimate Quadrature Spectra Q:
     Qzx =  np.imag(Heave_to_CSD(Z , Zx ,

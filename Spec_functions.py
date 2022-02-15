@@ -7,6 +7,11 @@ from urllib.request import urlretrieve
 import pandas as pd
 import os
 from nco import Nco
+import matplotlib.colors as colors
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+
+
 
 
 def Heave_to_RawSpec1D(heave,freq_new,sample_frequency, detrend, window):
@@ -205,12 +210,12 @@ def MEM(n_direction,a1, b1, a2, b2):
         f2 = c2 -c1*f1
         s1 = 1 - f1*np.conj(c1) - f2*np.conj(c2)
         den= 1 - f1*np.exp(-1j*direction) - f2*np.exp(-2j*direction)
-        d[:,nn,:]  = np.abs(np.real((1/2*np.pi)*((s1/(np.abs(den)**2) ))))
+        d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*np.pi))
     
     d['direction'] = np.round(np.linspace(0,360,n_direction),0) # ocean. dir.
     d['direction'].attrs["units"] = 'degrees'
-    
-    d = d/((2*90/np.pi)*2)
+    d= d*np.deg2rad(d.direction[2]-d.direction[1])
+    #print(np.sum(d.integrate("frequency"),axis=1))
     return d
 
 
@@ -298,3 +303,24 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     return ds
 
 
+def plot_Directional_Spectra(SPEC, fig_title, fig_format):
+    """
+    Plot Directional Spectra[frequency, direction] in polar coordinates
+    SPEC: xarray with coordinates frequency in Hz and direction in degrees (nautical convection)
+    fig_title: title string format
+    fig_format: format of the figure e.g., png, pdf, eps
+    """    
+    fig = plt.figure(figsize=(7,5))
+    ax = plt.subplot(111, polar=True)
+    ax.set_theta_direction(-1)
+    ax.set_theta_zero_location("N")
+    cs = ax.pcolormesh(np.deg2rad(SPEC['direction']), SPEC['frequency'], SPEC,cmap='turbo' ,shading='auto', norm=colors.LogNorm())
+    ticks_loc = ax.get_xticks().tolist()
+    ax.xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
+    ax.set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
+    ax.set_ylabel('')
+    ax.set_xlabel('')
+    ax.set_title(fig_title, fontsize=16)
+    fig.colorbar(cs, label='$S[m² s]$')
+    fig.savefig(fig_title+'_2DSPEC.'+fig_format, dpi=300)
+    plt.close()

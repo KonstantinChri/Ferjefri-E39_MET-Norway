@@ -294,7 +294,7 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
                                 dims   = ['time','frequency','direction'],
                                 coords = {'time': SPEC2D.time,'frequency':SPEC2D.frequency, 'direction':SPEC2D.direction},
-                                attrs  = {'units': 'm**2 s'})})
+                                attrs  = {'units': 'm**2 s'})}) # direction units in radians, therefore neglected
     return ds
 
 

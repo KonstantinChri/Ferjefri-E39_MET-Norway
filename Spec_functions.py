@@ -255,7 +255,7 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
                                      freq_resolution=freq_resolution,
                                      sample_frequency=1, 
                                      detrend_str=False, window_str='hann')['CSD'])
-   #Estimate Cross Spectra C:    
+   #Estimate Co- Spectra C:    
     Cyy =  np.real(Heave_to_CSD(Zy , Zy,
                                      freq_resolution=freq_resolution,
                                      sample_frequency=1, 

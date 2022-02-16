@@ -214,7 +214,7 @@ def MEM(n_direction,a1, b1, a2, b2):
     
     d['direction'] = np.round(np.linspace(0,360,n_direction),0) # ocean. dir.
     d['direction'].attrs["units"] = 'degrees'
-    d= d*np.deg2rad(d.direction[2]-d.direction[1])
+    d= d*np.deg2rad(d.direction[2]-d.direction[1]) 
     #print(np.sum(d.integrate("frequency"),axis=1))
     return d
 
@@ -299,7 +299,7 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
                                 dims   = ['time','frequency','direction'],
                                 coords = {'time': SPEC2D.time,'frequency':SPEC2D.frequency, 'direction':SPEC2D.direction},
-                                attrs  = {'units': 'm**2 s'})}) # direction units in radians, therefore neglected
+                                attrs  = {'units': 'm**2 s'})}) 
     return ds
 
 

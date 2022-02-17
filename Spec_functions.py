@@ -189,15 +189,15 @@ def download_E39_obs(start_date,end_date,buoy,fjord,variable):
 
     return
 
-def MEM(n_direction,a1, b1, a2, b2):
+def MEM(n_direction,a1, b1, a2, b2, direction_units):
     """ The function generates a Maximum entropy directional density matrix
     n_direction: number of directions.
     a1 b1 a2 b2: are the fourier coefficients size(time,frequency) """
-   
+    
     n_freq = len(a1.frequency)
     n_time = len(a1.time)
-    direction = np.linspace(0,2*np.pi,n_direction) # range 0...2pi
-    direction = np.mod(3*np.pi/2-direction,2*np.pi)  #Rotate to oceanographic dir.
+    direction0 = np.linspace(0,2*np.pi,n_direction) # range 0...2pi
+    direction = np.mod(3*np.pi/2-direction0,2*np.pi)  #Rotate to oceanographic dir.
     d = xr.DataArray(np.zeros((n_time, n_freq, n_direction)),
     dims=["time", "frequency", "direction"],
     coords={"time": a1.time, "frequency": a1.frequency, "direction": direction})
@@ -210,15 +210,22 @@ def MEM(n_direction,a1, b1, a2, b2):
         f2 = c2 -c1*f1
         s1 = 1 - f1*np.conj(c1) - f2*np.conj(c2)
         den= 1 - f1*np.exp(-1j*direction) - f2*np.exp(-2j*direction)
-        d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *180))
-    
-    d['direction'] = np.round(np.linspace(0,360,n_direction),0) # ocean. dir.
-    d['direction'].attrs["units"] = 'degrees'
-    #print(d.integrate("frequency").integrate('direction')) # integral of D should be close to 1
+        if direction_units == 'radians':
+            d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*np.pi))
+            d['direction'] = direction0 # ocean. dir.
+        elif direction_units == 'degrees':
+            d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*180))
+            d['direction'] = np.round(np.linspace(0,360,n_direction),0) # ocean. dir.
+            
+    d.attrs["units"] = '1/'+direction_units        
+    d['direction'].attrs["units"] = direction_units
+    d['frequency'].attrs["units"] = 'Hz'
+
+    #print(d.integrate('direction')) # integral of D should be close to 1
     return d
 
 
-def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequency):
+def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequency, direction_units):
     """
     Function for estimation of directional spectra(frequency,direction) 
     from heave, pitch and roll (tested for Wavescan buoys)
@@ -292,14 +299,14 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     b2 = 2*Cxy/(Czz*k*k) 
     
     # Use Max. Entropy Method:    
-    D = MEM(n_direction = n_direction, a1 = a1,b1 = b1,a2 = a2,b2 = b2)
+    D = MEM(n_direction = n_direction, a1 = a1,b1 = b1,a2 = a2,b2 = b2, direction_units = direction_units)
     # Estimate directional spectra
-    SPEC2D = Czz * D/2 
+    SPEC2D = Czz * D 
     # Create Dataset 
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
                                 dims   = ['time','frequency','direction'],
                                 coords = {'time': SPEC2D.time,'frequency':SPEC2D.frequency, 'direction':SPEC2D.direction},
-                                attrs  = {'units': 'm**2 s/deg', 'standard_name' : 'directional_spectrum'})}) 
+                                attrs  = {'units': 'm**2 /(Hz '+direction_units+')', 'standard_name' : 'directional_spectrum'})}) 
     # Estimate integrated parameters
     ds['Hm0'] = (4*(SPEC2D.integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum')
     ds['Hs'] = (4*np.std(raw_data.heave,axis=1)).assign_attrs(units='m', standard_name = 'significant_wave_height_from_heave')
@@ -308,11 +315,10 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
 
     ds['h_SPEC'] = (Czz).assign_attrs(units='m**2 s', standard_name = 'frequency_spectrum_from_heave')
 
-    
     return ds
 
 
-def plot_Directional_Spectra(SPEC, fig_title, fig_format):
+def plot_Directional_Spectra(SPEC, fig_title, SPEC_units, fig_format):
     """
     Plot Directional Spectra[frequency, direction] in polar coordinates
     SPEC: xarray with coordinates frequency in Hz and direction in degrees (nautical convection)
@@ -329,7 +335,7 @@ def plot_Directional_Spectra(SPEC, fig_title, fig_format):
     ax.set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
     ax.set_ylabel('')
     ax.set_xlabel('')
-    ax.set_title(fig_title, fontsize=16)
-    fig.colorbar(cs, label='$S[m² s/deg]$')
+    ax.set_title(fig_title, fontsize=16)   
+    fig.colorbar(cs, label=SPEC_units)
     fig.savefig(fig_title+'_2DSPEC.'+fig_format, dpi=300)
     plt.close()

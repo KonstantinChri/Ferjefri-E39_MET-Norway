@@ -210,12 +210,11 @@ def MEM(n_direction,a1, b1, a2, b2):
         f2 = c2 -c1*f1
         s1 = 1 - f1*np.conj(c1) - f2*np.conj(c2)
         den= 1 - f1*np.exp(-1j*direction) - f2*np.exp(-2j*direction)
-        d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*np.pi))
+        d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*180))
     
     d['direction'] = np.round(np.linspace(0,360,n_direction),0) # ocean. dir.
     d['direction'].attrs["units"] = 'degrees'
-    d= d*np.deg2rad(d.direction[2]-d.direction[1]) 
-    #print(np.sum(d.integrate("frequency"),axis=1))
+    #print(d.integrate("frequency").integrate('direction'))
     return d
 
 
@@ -235,7 +234,8 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     ds : xr.Dataset
         frequency: Array of frequencies [1/s]
         direction: Array of directions [degrees]
-        SPEC[time,frequency,direction]: Spectra array [m**2 s]
+        SPEC[time,frequency,direction]: Spectra array [m**2 s/deg]
+        and integrated parameters Hm0, Tp, pdir
     """
     R = np.deg2rad(raw_data['roll'])
     P = np.deg2rad(raw_data['pitch'])
@@ -293,13 +293,19 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     
     # Use Max. Entropy Method:    
     D = MEM(n_direction = n_direction, a1 = a1,b1 = b1,a2 = a2,b2 = b2)
-    
+    # Estimate directional spectra
     SPEC2D = Czz * D 
 
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
                                 dims   = ['time','frequency','direction'],
                                 coords = {'time': SPEC2D.time,'frequency':SPEC2D.frequency, 'direction':SPEC2D.direction},
-                                attrs  = {'units': 'm**2 s'})}) 
+                                attrs  = {'units': 'm**2 s/deg'})}) 
+    # Estimate integrated parameters
+    ds['Hm0'] = (4*(SPEC2D.integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum')
+    ds['Hs'] = (4*np.std(raw_data.heave,axis=1)).assign_attrs(units='m', standard_name = 'significant_wave_height_from_heave')
+    ds['Tp'] = 1/SPEC2D.integrate('direction').idxmax(dim='frequency').assign_attrs(units='s', standard_name = 'peak_wave_period')
+    ds['pdir'] = SPEC2D.integrate('frequency').idxmax(dim='direction').assign_attrs(units='deg', standard_name = 'peak_wave_direction')
+    
     return ds
 
 
@@ -321,6 +327,6 @@ def plot_Directional_Spectra(SPEC, fig_title, fig_format):
     ax.set_ylabel('')
     ax.set_xlabel('')
     ax.set_title(fig_title, fontsize=16)
-    fig.colorbar(cs, label='$S[m² s]$')
+    fig.colorbar(cs, label='$S[m² s/deg]$')
     fig.savefig(fig_title+'_2DSPEC.'+fig_format, dpi=300)
     plt.close()

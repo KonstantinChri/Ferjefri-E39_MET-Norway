@@ -210,11 +210,11 @@ def MEM(n_direction,a1, b1, a2, b2):
         f2 = c2 -c1*f1
         s1 = 1 - f1*np.conj(c1) - f2*np.conj(c2)
         den= 1 - f1*np.exp(-1j*direction) - f2*np.exp(-2j*direction)
-        d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*180))
+        d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *180))
     
     d['direction'] = np.round(np.linspace(0,360,n_direction),0) # ocean. dir.
     d['direction'].attrs["units"] = 'degrees'
-    #print(d.integrate("frequency").integrate('direction'))
+    #print(d.integrate("frequency").integrate('direction')) # integral of D should be close to 1
     return d
 
 
@@ -294,17 +294,20 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     # Use Max. Entropy Method:    
     D = MEM(n_direction = n_direction, a1 = a1,b1 = b1,a2 = a2,b2 = b2)
     # Estimate directional spectra
-    SPEC2D = Czz * D 
-
+    SPEC2D = Czz * D/2 
+    # Create Dataset 
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
                                 dims   = ['time','frequency','direction'],
                                 coords = {'time': SPEC2D.time,'frequency':SPEC2D.frequency, 'direction':SPEC2D.direction},
-                                attrs  = {'units': 'm**2 s/deg'})}) 
+                                attrs  = {'units': 'm**2 s/deg', 'standard_name' : 'directional_spectrum'})}) 
     # Estimate integrated parameters
     ds['Hm0'] = (4*(SPEC2D.integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum')
     ds['Hs'] = (4*np.std(raw_data.heave,axis=1)).assign_attrs(units='m', standard_name = 'significant_wave_height_from_heave')
     ds['Tp'] = 1/SPEC2D.integrate('direction').idxmax(dim='frequency').assign_attrs(units='s', standard_name = 'peak_wave_period')
     ds['pdir'] = SPEC2D.integrate('frequency').idxmax(dim='direction').assign_attrs(units='deg', standard_name = 'peak_wave_direction')
+
+    ds['h_SPEC'] = (Czz).assign_attrs(units='m**2 s', standard_name = 'frequency_spectrum_from_heave')
+
     
     return ds
 

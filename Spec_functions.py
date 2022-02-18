@@ -239,9 +239,9 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     Returns
     -------
     ds : xr.Dataset
-        frequency: Array of frequencies [1/s]
+        frequency: Array of frequencies [Hz]
         direction: Array of directions [degrees]
-        SPEC[time,frequency,direction]: Spectra array [m**2 s/deg]
+        SPEC[time,frequency,direction]: Spectra array [m² /Hz*deg or m²/Hz*rad]
         and integrated parameters Hm0, Tp, pdir
     """
     R = np.deg2rad(raw_data['roll'])
@@ -303,33 +303,46 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     # Estimate directional spectra
     SPEC2D = Czz * D 
     # Create Dataset 
+    if direction_units == 'radians':
+        direction_units = '' # no units for radians in SPEC
+    elif direction_units == 'degrees':
+        direction_units = '*deg' 
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
                                 dims   = ['time','frequency','direction'],
                                 coords = {'time': SPEC2D.time,'frequency':SPEC2D.frequency, 'direction':SPEC2D.direction},
-                                attrs  = {'units': 'm**2 /(Hz '+direction_units+')', 'standard_name' : 'directional_spectrum'})}) 
+                                attrs  = {'units': 'm² /Hz'+direction_units, 'standard_name' : 'directional_spectrum'})}) 
     # Estimate integrated parameters
     ds['Hm0'] = (4*(SPEC2D.integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum')
     ds['Hs'] = (4*np.std(raw_data.heave,axis=1)).assign_attrs(units='m', standard_name = 'significant_wave_height_from_heave')
     ds['Tp'] = 1/SPEC2D.integrate('direction').idxmax(dim='frequency').assign_attrs(units='s', standard_name = 'peak_wave_period')
     ds['pdir'] = SPEC2D.integrate('frequency').idxmax(dim='direction').assign_attrs(units='deg', standard_name = 'peak_wave_direction')
 
-    ds['h_SPEC'] = (Czz).assign_attrs(units='m**2 s', standard_name = 'frequency_spectrum_from_heave')
+    ds['h_SPEC'] = (Czz).assign_attrs(units='m^2 /Hz', standard_name = 'frequency_spectrum_from_heave')
 
     return ds
 
 
-def plot_Directional_Spectra(SPEC, fig_title, SPEC_units, fig_format):
+def plot_Directional_Spectra(SPEC,plot_type,cmap,filter_factor, fig_title, SPEC_units, fig_format):
     """
     Plot Directional Spectra[frequency, direction] in polar coordinates
     SPEC: xarray with coordinates frequency in Hz and direction in degrees (nautical convection)
     fig_title: title string format
     fig_format: format of the figure e.g., png, pdf, eps
     """    
+    if SPEC_units == 'm² /Hz*deg':
+        theta = np.deg2rad(SPEC['direction'])
+    else:
+        theta = SPEC['direction']
+        
+    SPEC = SPEC.where(SPEC>SPEC.max()*filter_factor,np.nan) # set to nan values < SPEC.max()*filter_factor
     fig = plt.figure(figsize=(7,5))
     ax = plt.subplot(111, polar=True)
     ax.set_theta_direction(-1)
     ax.set_theta_zero_location("N")
-    cs = ax.pcolormesh(np.deg2rad(SPEC['direction']), SPEC['frequency'], SPEC,cmap='turbo' ,shading='auto', norm=colors.LogNorm())
+    if plot_type == 'pcolormesh':
+        cs = ax.pcolormesh(theta, SPEC['frequency'], SPEC,cmap=cmap ,shading='auto', norm=colors.LogNorm())
+    elif plot_type == 'contourf':
+        cs = ax.contourf(theta, SPEC['frequency'], SPEC,cmap=cmap,norm=colors.LogNorm())
     ticks_loc = ax.get_xticks().tolist()
     ax.xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
     ax.set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])

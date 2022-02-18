@@ -217,7 +217,7 @@ def MEM(n_direction,a1, b1, a2, b2, direction_units):
             d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*180))
             d['direction'] = np.round(np.linspace(0,360,n_direction),0) # ocean. dir.
             
-    d.attrs["units"] = direction_units        
+    d.attrs["units"] = '1/'+direction_units # However, d is dimensionless        
     d['direction'].attrs["units"] = direction_units
     d['frequency'].attrs["units"] = 'Hz'
 
@@ -329,7 +329,7 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     ds['kurtosis'] = ((Z**4).mean('samples')/((Z**2).mean('samples'))**2) -1  # degree of peakedness
     ds['skewness'] = ((Z**3).mean('samples')/((Z**2).mean('samples'))**(3/2))  # degree of asymmetry
     ds['spec_width'] = (((m0*m2/(m1**2)) - 1)**0.5).assign_attrs(standard_name = 'spectral_width')
-    #ds['D'] = D.sel(frequency=fp,direction=np.deg2rad(pdir))
+    #ds['sigma_p'] = D.sel(frequency=fp,direction=np.deg2rad(pdir))
 
 
     return ds

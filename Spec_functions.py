@@ -217,7 +217,7 @@ def MEM(n_direction,a1, b1, a2, b2, direction_units):
             d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*180))
             d['direction'] = np.round(np.linspace(0,360,n_direction),0) # ocean. dir.
             
-    d.attrs["units"] = '1/'+direction_units        
+    d.attrs["units"] = direction_units        
     d['direction'].attrs["units"] = direction_units
     d['frequency'].attrs["units"] = 'Hz'
 
@@ -305,8 +305,11 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     # Create Dataset 
     if direction_units == 'radians':
         direction_units = '' # no units for radians in SPEC
+        pdir = np.rad2deg(SPEC2D.integrate('frequency').idxmax(dim='direction'))
     elif direction_units == 'degrees':
         direction_units = '*deg' 
+        pdir = SPEC2D.integrate('frequency').idxmax(dim='direction')
+        
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
                                 dims   = ['time','frequency','direction'],
                                 coords = {'time': SPEC2D.time,'frequency':SPEC2D.frequency, 'direction':SPEC2D.direction},
@@ -314,15 +317,25 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     # Estimate integrated parameters
     ds['Hm0'] = (4*(SPEC2D.integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum')
     ds['Hs'] = (4*np.std(raw_data.heave,axis=1)).assign_attrs(units='m', standard_name = 'significant_wave_height_from_heave')
-    ds['Tp'] = 1/SPEC2D.integrate('direction').idxmax(dim='frequency').assign_attrs(units='s', standard_name = 'peak_wave_period')
-    ds['pdir'] = SPEC2D.integrate('frequency').idxmax(dim='direction').assign_attrs(units='deg', standard_name = 'peak_wave_direction')
+    fp = SPEC2D.integrate('direction').idxmax(dim='frequency')
+    ds['Tp'] = (1/fp).assign_attrs(units='s', standard_name = 'peak_wave_period')
+    ds['pdir'] = pdir.assign_attrs(units='deg', standard_name = 'peak_wave_direction')
 
     ds['h_SPEC'] = (Czz).assign_attrs(units='m^2 /Hz', standard_name = 'frequency_spectrum_from_heave')
+    m0 = ds['h_SPEC'].integrate('frequency')
+    m1 = (ds['frequency']*ds['h_SPEC']).integrate('frequency')
+    m2 = (ds['frequency']*ds['frequency']*ds['h_SPEC']).integrate('frequency')
+    
+    ds['kurtosis'] = ((Z**4).mean('samples')/((Z**2).mean('samples'))**2) -1  # degree of peakedness
+    ds['skewness'] = ((Z**3).mean('samples')/((Z**2).mean('samples'))**(3/2))  # degree of asymmetry
+    ds['spec_width'] = (((m0*m2/(m1**2)) - 1)**0.5).assign_attrs(standard_name = 'spectral_width')
+    #ds['D'] = D.sel(frequency=fp,direction=np.deg2rad(pdir))
+
 
     return ds
 
 
-def plot_Directional_Spectra(SPEC,plot_type,cmap,filter_factor, fig_title, SPEC_units, fig_format):
+def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_units, fig_format):
     """
     Plot Directional Spectra[frequency, direction] in polar coordinates
     SPEC: xarray with coordinates frequency in Hz and direction in degrees (nautical convection)
@@ -330,11 +343,11 @@ def plot_Directional_Spectra(SPEC,plot_type,cmap,filter_factor, fig_title, SPEC_
     fig_format: format of the figure e.g., png, pdf, eps
     """    
     if SPEC_units == 'm² /Hz*deg':
-        theta = np.deg2rad(SPEC['direction'])
+        theta = np.deg2rad(ds.SPEC['direction'])
     else:
-        theta = SPEC['direction']
+        theta = ds.SPEC['direction']
         
-    SPEC = SPEC.where(SPEC>SPEC.max()*filter_factor,np.nan) # set to nan values < SPEC.max()*filter_factor
+    SPEC = ds.SPEC.where(ds.SPEC>ds.SPEC.max()*filter_factor,np.nan) # set to nan values < SPEC.max()*filter_factor
     fig = plt.figure(figsize=(7,5))
     ax = plt.subplot(111, polar=True)
     ax.set_theta_direction(-1)
@@ -348,6 +361,15 @@ def plot_Directional_Spectra(SPEC,plot_type,cmap,filter_factor, fig_title, SPEC_
     ax.set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
     ax.set_ylabel('')
     ax.set_xlabel('')
+    # Adding text on the plot.
+    plt.gcf().text(0.01, 0.05, 
+                   '$H_{m0}$:'+str(ds.Hm0.values.round(1))+' m' +'\n'+ 
+                   '$T_{p}$:'+str(ds.Tp.values.round(1))+' s'+'\n'+
+                   '$\u03B8_p$:'+str(ds.pdir.values.round(1))+'$^o$'+'\n'+
+                   '$kurtosis$:'+str(ds.kurtosis.values.round(1))+'\n'+
+                   '$skewness$:'+str(ds.skewness.values.round(3))+'\n'+
+                   '$\u03BD$:'+str(ds.spec_width.values.round(2))+'\n',
+                   fontsize=14)
     ax.set_title(fig_title, fontsize=16)   
     fig.colorbar(cs, label=SPEC_units)
     fig.savefig(fig_title+'_2DSPEC.'+fig_format, dpi=300)

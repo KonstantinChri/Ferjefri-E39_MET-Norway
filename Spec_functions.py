@@ -196,7 +196,7 @@ def MEM(n_direction,a1, b1, a2, b2, direction_units):
     
     n_freq = len(a1.frequency)
     n_time = len(a1.time)
-    direction0 = np.linspace(0,2*np.pi,n_direction) # range 0...2pi
+    direction0 = np.linspace(0,2*np.pi,n_direction) # range 0...2pi, nautical dir.
     direction = np.mod(3*np.pi/2-direction0,2*np.pi)  #Rotate to oceanographic dir.
     d = xr.DataArray(np.zeros((n_time, n_freq, n_direction)),
     dims=["time", "frequency", "direction"],
@@ -210,14 +210,14 @@ def MEM(n_direction,a1, b1, a2, b2, direction_units):
         f2 = c2 -c1*f1
         s1 = 1 - f1*np.conj(c1) - f2*np.conj(c2)
         den= 1 - f1*np.exp(-1j*direction) - f2*np.exp(-2j*direction)
-        if direction_units == 'radians':
+        if direction_units == 'rad':
             d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*np.pi))
-            d['direction'] = direction0 # ocean. dir.
-        elif direction_units == 'degrees':
+            d['direction'] = direction0 # naut. dir.
+        elif direction_units == 'deg':
             d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*180))
-            d['direction'] = np.round(np.linspace(0,360,n_direction),0) # ocean. dir.
+            d['direction'] = np.round(np.linspace(0,360,n_direction),0) # naut. dir.
             
-    d.attrs["units"] = '1/'+direction_units # However, d is dimensionless        
+    d.attrs["units"] = '1/'+direction_units #In general,  d is dimensionless        
     d['direction'].attrs["units"] = direction_units
     d['frequency'].attrs["units"] = 'Hz'
 
@@ -303,22 +303,22 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     # Estimate directional spectra
     SPEC2D = Czz * D 
     # Create Dataset 
-    if direction_units == 'radians':
-        direction_units = '' # no units for radians in SPEC
-        pdir = np.rad2deg(SPEC2D.integrate('frequency').idxmax(dim='direction'))
-    elif direction_units == 'degrees':
-        direction_units = '*deg' 
-        pdir = SPEC2D.integrate('frequency').idxmax(dim='direction')
-        
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
                                 dims   = ['time','frequency','direction'],
                                 coords = {'time': SPEC2D.time,'frequency':SPEC2D.frequency, 'direction':SPEC2D.direction},
-                                attrs  = {'units': 'm² /Hz'+direction_units, 'standard_name' : 'directional_spectrum'})}) 
+                                attrs  = {'units': 'm²/Hz/'+direction_units, 'standard_name' : 'directional_spectrum'})}) 
     # Estimate integrated parameters
     ds['Hm0'] = (4*(SPEC2D.integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum')
     ds['Hs'] = (4*np.std(raw_data.heave,axis=1)).assign_attrs(units='m', standard_name = 'significant_wave_height_from_heave')
     fp = SPEC2D.integrate('direction').idxmax(dim='frequency')
     ds['Tp'] = (1/fp).assign_attrs(units='s', standard_name = 'peak_wave_period')
+    
+    if direction_units == 'rad':
+        pdir = np.rad2deg(SPEC2D.integrate('frequency').idxmax(dim='direction'))
+        #ds['sigma'] = np.rad2deg((np.sin((0.5*ds['direction']))**2)*D).integrate('direction')
+        #ds['sigma_p'] = ds['sigma'].sel(frequency=ds.fp)
+    elif direction_units == 'deg':
+        pdir = SPEC2D.integrate('frequency').idxmax(dim='direction')
     ds['pdir'] = pdir.assign_attrs(units='deg', standard_name = 'peak_wave_direction')
 
     ds['h_SPEC'] = (Czz).assign_attrs(units='m^2 /Hz', standard_name = 'frequency_spectrum_from_heave')
@@ -329,7 +329,6 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     ds['kurtosis'] = ((Z**4).mean('samples')/((Z**2).mean('samples'))**2) -1  # degree of peakedness
     ds['skewness'] = ((Z**3).mean('samples')/((Z**2).mean('samples'))**(3/2))  # degree of asymmetry
     ds['spec_width'] = (((m0*m2/(m1**2)) - 1)**0.5).assign_attrs(standard_name = 'spectral_width')
-    #ds['sigma_p'] = D.sel(frequency=fp,direction=np.deg2rad(pdir))
 
 
     return ds
@@ -342,7 +341,7 @@ def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_un
     fig_title: title string format
     fig_format: format of the figure e.g., png, pdf, eps
     """    
-    if SPEC_units == 'm² /Hz*deg':
+    if SPEC_units == 'm²/Hz/deg':
         theta = np.deg2rad(ds.SPEC['direction'])
     else:
         theta = ds.SPEC['direction']

@@ -261,31 +261,31 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     # Estimate Quadrature Spectra Q:
     Qzx =  np.imag(Heave_to_CSD(Z , Zx ,
                                      freq_resolution=freq_resolution,
-                                     sample_frequency=1, 
+                                     sample_frequency=sample_frequency, 
                                      detrend_str=False, window_str='hann')['CSD'])    
     Qzy =  np.imag(Heave_to_CSD(Z , Zy,
                                      freq_resolution=freq_resolution,
-                                     sample_frequency=1, 
+                                     sample_frequency=sample_frequency, 
                                      detrend_str=False, window_str='hann')['CSD'])
    #Estimate Co- Spectra C:    
     Cyy =  np.real(Heave_to_CSD(Zy , Zy,
                                      freq_resolution=freq_resolution,
-                                     sample_frequency=1, 
+                                     sample_frequency=sample_frequency, 
                                      detrend_str=False, window_str='hann')['CSD'])
     
     Cxx =  np.real(Heave_to_CSD(Zx , Zx,
                                      freq_resolution=freq_resolution,
-                                     sample_frequency=1, 
+                                     sample_frequency=sample_frequency, 
                                      detrend_str=False, window_str='hann')['CSD'])
     
     Cxy =  np.real(Heave_to_CSD(Zx , Zy,
                                       freq_resolution=freq_resolution,
-                                      sample_frequency=1, 
+                                      sample_frequency=sample_frequency, 
                                       detrend_str=False, window_str='hann')['CSD'])              
       
     Czz =  np.real(Heave_to_CSD(Z , Z,
                                       freq_resolution=freq_resolution,
-                                      sample_frequency=1, 
+                                      sample_frequency=sample_frequency, 
                                       detrend_str=False, window_str='hann')['CSD'])  
     
     # Estimate Wavenumber using cross spectra    
@@ -315,26 +315,16 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     
     if direction_units == 'rad':
         pdir = np.rad2deg(SPEC2D.integrate('frequency').idxmax(dim='direction'))
-        #ds['sigma'] = np.rad2deg((np.sin((0.5*ds['direction']))**2)*D).integrate('direction')
-        #ds['sigma_p'] = ds['sigma'].sel(frequency=ds.fp)
     elif direction_units == 'deg':
         pdir = SPEC2D.integrate('frequency').idxmax(dim='direction')
     ds['pdir'] = pdir.assign_attrs(units='deg', standard_name = 'peak_wave_direction')
 
-    ds['h_SPEC'] = (Czz).assign_attrs(units='m^2 /Hz', standard_name = 'frequency_spectrum_from_heave')
-    m0 = ds['h_SPEC'].integrate('frequency')
-    m1 = (ds['frequency']*ds['h_SPEC']).integrate('frequency')
-    m2 = (ds['frequency']*ds['frequency']*ds['h_SPEC']).integrate('frequency')
-    
-    ds['kurtosis'] = ((Z**4).mean('samples')/((Z**2).mean('samples'))**2) -1  # degree of peakedness
-    ds['skewness'] = ((Z**3).mean('samples')/((Z**2).mean('samples'))**(3/2))  # degree of asymmetry
-    ds['spec_width'] = (((m0*m2/(m1**2)) - 1)**0.5).assign_attrs(standard_name = 'spectral_width')
-
+    ds['h_SPEC'] = (Czz).assign_attrs(units='m²/Hz', standard_name = 'frequency_spectrum_from_heave')
 
     return ds
 
 
-def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_units, fig_format):
+def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_units, add_var, fig_format):
     """
     Plot Directional Spectra[frequency, direction] in polar coordinates
     SPEC: xarray with coordinates frequency in Hz and direction in degrees (nautical convection)
@@ -361,14 +351,17 @@ def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_un
     ax.set_ylabel('')
     ax.set_xlabel('')
     # Adding text on the plot.
-    plt.gcf().text(0.01, 0.05, 
-                   '$H_{m0}$:'+str(ds.Hm0.values.round(1))+' m' +'\n'+ 
-                   '$T_{p}$:'+str(ds.Tp.values.round(1))+' s'+'\n'+
-                   '$\u03B8_p$:'+str(ds.pdir.values.round(1))+'$^o$'+'\n'+
-                   '$kurtosis$:'+str(ds.kurtosis.values.round(1))+'\n'+
-                   '$skewness$:'+str(ds.skewness.values.round(3))+'\n'+
-                   '$\u03BD$:'+str(ds.spec_width.values.round(2))+'\n',
-                   fontsize=14)
+    if add_var == True:
+        plt.gcf().text(0.01, 0.05, 
+                       '$H_{m0}$:'+str(ds.Hm0.values.round(1))+' m' +'\n'+ 
+                       '$T_{p}$:'+str(ds.Tp.values.round(1))+' s'+'\n'+
+                       '$\u03B8_p$:'+str(ds.pdir.values.round(1))+'$^o$'+'\n',
+                       #'$kurtosis$:'+str(ds.kurtosis.values.round(1))+'\n'+
+                       #'$skewness$:'+str(ds.skewness.values.round(3))+'\n'+
+                       #'$\u03BD$:'+str(ds.spec_width.values.round(2))+'\n',
+                       fontsize=14)
+    else:
+        pass
     ax.set_title(fig_title, fontsize=16)   
     fig.colorbar(cs, label=SPEC_units)
     fig.savefig(fig_title+'_2DSPEC.'+fig_format, dpi=300)

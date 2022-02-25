@@ -151,7 +151,7 @@ def Heave_to_CSD(heave1,heave2,freq_resolution,sample_frequency, detrend_str, wi
                                 dims   = ['time','frequency'],
                                 coords = {'time': ds0.time,'frequency':freq},
                                 attrs  = {'units': 'm**2 s'})})
-    ds['frequency'].attrs["units"] = '1/s'
+    ds['frequency'].attrs["units"] = 'Hz'
     return ds
 
 
@@ -320,11 +320,32 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     ds['pdir'] = pdir.assign_attrs(units='deg', standard_name = 'peak_wave_direction')
 
     ds['h_SPEC'] = (Czz).assign_attrs(units='m²/Hz', standard_name = 'frequency_spectrum_from_heave')
-
+    # m0 = ds['h_SPEC'].integrate('frequency')
+    # m1 = (ds['frequency']*ds['h_SPEC']).integrate('frequency')
+    # m2 = (ds['frequency']*ds['frequency']*ds['h_SPEC']).integrate('frequency')
+    
+    # ds['kurtosis'] = ((Z**4).mean('samples')/((Z**2).mean('samples'))**2) -1  # degree of peakedness
+    # ds['skewness'] = ((Z**3).mean('samples')/((Z**2).mean('samples'))**(3/2))  # degree of asymmetry
+    # ds['spec_width'] = (((m0*m2/(m1**2)) - 1)**0.5).assign_attrs(standard_name = 'spectral_width')
     return ds
 
 
-def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_units, add_var, fig_format):
+def Spectral_Partition(ds, beta):
+    ds['cp'] = 9.81/(2*np.pi*ds['frequency'])
+    ds['A']  = beta*(ds['WindSpeed']/ds['cp'])*np.cos(ds['direction']-np.rad2deg(ds['WindDirection']))
+    ds['SPEC_swell'] = ds['SPEC'].where(ds['A']<=1,0)
+    ds['SPEC_windsea'] = ds['SPEC'].where(ds['A']>1,0)
+    # Estimate integrated parameters
+    part = ['swell','windsea']
+    for k in range(len(part)):
+        ds['Hm0_'+part[k]] = (4*(ds['SPEC_'+part[k]].integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum_'+part[k])
+        ds['Tp_'+part[k]] = (1/ds['SPEC_'+part[k]].integrate('direction').idxmax(dim='frequency')).assign_attrs(units='s', standard_name = 'peak_wave_period_'+part[k])
+        ds['pdir_'+part[k]] = np.rad2deg(ds['SPEC_'+part[k]].integrate('frequency').idxmax(dim='direction'))
+   
+    return ds
+
+
+def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_units, add_par,add_h_Spec, fig_format):
     """
     Plot Directional Spectra[frequency, direction] in polar coordinates
     SPEC: xarray with coordinates frequency in Hz and direction in degrees (nautical convection)
@@ -335,7 +356,8 @@ def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_un
         theta = np.deg2rad(ds.SPEC['direction'])
     else:
         theta = ds.SPEC['direction']
-        
+ 
+    
     SPEC = ds.SPEC.where(ds.SPEC>ds.SPEC.max()*filter_factor,np.nan) # set to nan values < SPEC.max()*filter_factor
     fig = plt.figure(figsize=(7,5))
     ax = plt.subplot(111, polar=True)
@@ -350,19 +372,48 @@ def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_un
     ax.set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
     ax.set_ylabel('')
     ax.set_xlabel('')
+
     # Adding text on the plot.
-    if add_var == True:
+    if add_par == True:
         plt.gcf().text(0.01, 0.05, 
                        '$H_{m0}$:'+str(ds.Hm0.values.round(1))+' m' +'\n'+ 
                        '$T_{p}$:'+str(ds.Tp.values.round(1))+' s'+'\n'+
-                       '$\u03B8_p$:'+str(ds.pdir.values.round(1))+'$^o$'+'\n',
-                       #'$kurtosis$:'+str(ds.kurtosis.values.round(1))+'\n'+
-                       #'$skewness$:'+str(ds.skewness.values.round(3))+'\n'+
-                       #'$\u03BD$:'+str(ds.spec_width.values.round(2))+'\n',
-                       fontsize=14)
+                       '$\u03B8_p$:'+str(ds.pdir.values.round(1))+'$^o$'+'\n'+
+                       # '---------------'+'\n'+
+                       # '$H_{m0,swell}$:'+str(ds.Hm0_swell.values.round(1))+' m' +'\n'+ 
+                       # '$T_{p,swell}$:'+str(ds.Tp_swell.values.round(1))+' s'+'\n'+
+                       # '$\u03B8_{p,swell}$:'+str(ds.pdir_swell.values.round(1))+'$^o$'+'\n'+
+                       # '---------------'+'\n'+
+                       # '$H_{m0,wind}$:'+str(ds.Hm0_windsea.values.round(1))+' m' +'\n'+ 
+                       # '$T_{p,wind}$:'+str(ds.Tp_windsea.values.round(1))+' s'+'\n'+
+                       # '$\u03B8_{p,wind}$:'+str(ds.pdir_windsea.values.round(1))+'$^o$'+'\n'+
+                       '---------------'+'\n'+                      
+                       '$U_w$:'+str(ds.WindSpeed.values.round(1))+' $m/s$'+'\n'+
+                       '$\u03B8_{w}$:'+str(ds.WindDirection.values.round(1))+'$^o$'+'\n'+
+                       '---------------'+'\n'+
+                       '$U_c$:'+str(ds.currSp001.values.round(1))+' $m/s$'+'\n'+
+                       '$\u03B8_{c}$:'+str(ds.currDir001.values.round(1))+'$^o$'+'\n'
+                       ,fontsize=14)
     else:
         pass
+    
+    if add_h_Spec == True:
+        plt.axes([.84, .09, .12, .3], facecolor= None)
+        ds.h_SPEC.plot()
+        plt.ylabel('[m²/Hz]')
+        plt.xlabel('[Hz]')
+        fig.colorbar(cs,shrink=0.5,orientation='horizontal', label=SPEC_units)
+    else:
+        fig.colorbar(cs, label=SPEC_units)
     ax.set_title(fig_title, fontsize=16)   
-    fig.colorbar(cs, label=SPEC_units)
     fig.savefig(fig_title+'_2DSPEC.'+fig_format, dpi=300)
     plt.close()
+    
+    
+    
+    
+    
+    
+    
+    
+    

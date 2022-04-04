@@ -146,7 +146,7 @@ def Heave_to_CSD(heave1,heave2,freq_resolution,sample_frequency, detrend_str, wi
                                   noverlap=0.5*(sample_frequency/freq_resolution),
                                    nfft=None, detrend=detrend_str, window=window_str,
                                    axis=-1)
-    
+
     ds = xr.Dataset({'CSD': xr.DataArray(CSD,
                                 dims   = ['time','frequency'],
                                 coords = {'time': ds0.time,'frequency':freq},
@@ -193,7 +193,7 @@ def MEM(n_direction,a1, b1, a2, b2, direction_units):
     """ The function generates a Maximum entropy directional density matrix
     n_direction: number of directions.
     a1 b1 a2 b2: are the fourier coefficients size(time,frequency) """
-    
+
     n_freq = len(a1.frequency)
     n_time = len(a1.time)
     direction0 = np.linspace(0,2*np.pi,n_direction) # range 0...2pi, nautical dir.
@@ -202,10 +202,10 @@ def MEM(n_direction,a1, b1, a2, b2, direction_units):
     dims=["time", "frequency", "direction"],
     coords={"time": a1.time, "frequency": a1.frequency, "direction": direction})
     direction  = xr.DataArray(direction,dims=["direction"])
-    
+
     for nn in range(0,n_freq):
         c1 = a1[:,nn]+1j*b1[:,nn]
-        c2 = a2[:,nn]+1j*b2[:,nn] 
+        c2 = a2[:,nn]+1j*b2[:,nn]
         f1 = ( c1 - c2*np.conj(c1) )/(1-np.abs(c1)**2)
         f2 = c2 -c1*f1
         s1 = 1 - f1*np.conj(c1) - f2*np.conj(c2)
@@ -216,8 +216,8 @@ def MEM(n_direction,a1, b1, a2, b2, direction_units):
         elif direction_units == 'deg':
             d[:,nn,:]  = np.real(s1/(np.abs(den)**2 *2*180))
             d['direction'] = np.round(np.linspace(0,360,n_direction),0) # naut. dir.
-            
-    d.attrs["units"] = '1/'+direction_units #In general,  d is dimensionless        
+
+    d.attrs["units"] = '1/'+direction_units #In general,  d is dimensionless
     d['direction'].attrs["units"] = direction_units
     d['frequency'].attrs["units"] = 'Hz'
 
@@ -227,13 +227,13 @@ def MEM(n_direction,a1, b1, a2, b2, direction_units):
 
 def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequency, direction_units):
     """
-    Function for estimation of directional spectra(frequency,direction) 
+    Function for estimation of directional spectra(frequency,direction)
     from heave, pitch and roll (tested for Wavescan buoys)
     Parameters:
     ----------
     raw_data : Xarray dataset containing variables:
         heave(time,samples) in meters, pitch(time,samples) in degress,
-        roll(time,samples) in degress and compass(time,samples) in degrees 
+        roll(time,samples) in degress and compass(time,samples) in degrees
     freq_resolution : desired resolution of frequencies in Hz, common used 0.01Hz
     sample_frequency: value in Hz e.g., for Svinøy buoy is 1 Hz, A-F is 2 Hz
     Returns
@@ -248,71 +248,76 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     P = np.deg2rad(raw_data['pitch'])
     Z = raw_data['heave']
     A = np.deg2rad(raw_data['compass'])
-    
+
     # Estimate slopes (east-west and north/south):
     Zy = ((np.sin(P)/np.cos(P))*np.sin(A)) + (np.sin(R)/(np.cos(P)*np.cos(R))*np.cos(A))
-    Zx = ((np.sin(P)/np.cos(P))*np.cos(A)) - (np.sin(R)/(np.cos(P)*np.cos(R))*np.sin(A))  
-    
+    Zx = ((np.sin(P)/np.cos(P))*np.cos(A)) - (np.sin(R)/(np.cos(P)*np.cos(R))*np.sin(A))
+
+    del R, P, A, raw_data
     # More details about the methodology can be found:
-    # Longuet-Higgins et al (1963) , Lygre and Krogstad (1986), 
+    # Longuet-Higgins et al (1963) , Lygre and Krogstad (1986),
     # P.N. Ananth et al. (1992), F. P. Brissette et al. (1994), Steele et al. (1998)
     # Nondirectional and Directional Wave Data Analysis Procedures,  NDBC Technical Document 96-01
-    
+
     # Estimate Quadrature Spectra Q:
     Qzx =  np.imag(Heave_to_CSD(Z , Zx ,
                                      freq_resolution=freq_resolution,
-                                     sample_frequency=sample_frequency, 
-                                     detrend_str=False, window_str='hann')['CSD'])    
+                                     sample_frequency=sample_frequency,
+                                     detrend_str=False, window_str='hann')['CSD'])
     Qzy =  np.imag(Heave_to_CSD(Z , Zy,
                                      freq_resolution=freq_resolution,
-                                     sample_frequency=sample_frequency, 
+                                     sample_frequency=sample_frequency,
                                      detrend_str=False, window_str='hann')['CSD'])
-   #Estimate Co- Spectra C:    
-    Cyy =  np.real(Heave_to_CSD(Zy , Zy,
-                                     freq_resolution=freq_resolution,
-                                     sample_frequency=sample_frequency, 
-                                     detrend_str=False, window_str='hann')['CSD'])
-    
-    Cxx =  np.real(Heave_to_CSD(Zx , Zx,
-                                     freq_resolution=freq_resolution,
-                                     sample_frequency=sample_frequency, 
-                                     detrend_str=False, window_str='hann')['CSD'])
-    
-    Cxy =  np.real(Heave_to_CSD(Zx , Zy,
-                                      freq_resolution=freq_resolution,
-                                      sample_frequency=sample_frequency, 
-                                      detrend_str=False, window_str='hann')['CSD'])              
-      
+   #Estimate Co- Spectra C:
     Czz =  np.real(Heave_to_CSD(Z , Z,
                                       freq_resolution=freq_resolution,
-                                      sample_frequency=sample_frequency, 
-                                      detrend_str=False, window_str='hann')['CSD'])  
-    
-    # Estimate Wavenumber using cross spectra    
+                                      sample_frequency=sample_frequency,
+                                      detrend_str=False, window_str='hann')['CSD'])
+
+    Cyy =  np.real(Heave_to_CSD(Zy , Zy,
+                                     freq_resolution=freq_resolution,
+                                     sample_frequency=sample_frequency,
+                                     detrend_str=False, window_str='hann')['CSD'])
+
+    Cxx =  np.real(Heave_to_CSD(Zx , Zx,
+                                     freq_resolution=freq_resolution,
+                                     sample_frequency=sample_frequency,
+                                     detrend_str=False, window_str='hann')['CSD'])
+
+    Cxy =  np.real(Heave_to_CSD(Zx , Zy,
+                                      freq_resolution=freq_resolution,
+                                      sample_frequency=sample_frequency,
+                                      detrend_str=False, window_str='hann')['CSD'])
+
+
+    del Zx, Zy
+    # Estimate Wavenumber using cross spectra
     k = np.sqrt( (Cxx+Cyy)/Czz )
- 
+
     #Estimate first 4 Fourier Coefficients:
     a1 = Qzy/(k*Czz)
     b1 = Qzx/(k*Czz)
-    
+
     a2 = (Cyy - Cxx)/(Czz*k*k)
-    b2 = 2*Cxy/(Czz*k*k) 
-    
-    # Use Max. Entropy Method:    
+    b2 = 2*Cxy/(Czz*k*k)
+
+    del Qzy, Qzx, Cxx, Cyy, Cxy
+    # Use Max. Entropy Method:
     D = MEM(n_direction = n_direction, a1 = a1,b1 = b1,a2 = a2,b2 = b2, direction_units = direction_units)
     # Estimate directional spectra
-    SPEC2D = Czz * D 
-    # Create Dataset 
+    SPEC2D = Czz * D
+    del D
+    # Create Dataset
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC2D,
                                 dims   = ['time','frequency','direction'],
                                 coords = {'time': SPEC2D.time,'frequency':SPEC2D.frequency, 'direction':SPEC2D.direction},
-                                attrs  = {'units': 'm²/Hz/'+direction_units, 'standard_name' : 'directional_spectrum'})}) 
+                                attrs  = {'units': 'm²/Hz/'+direction_units, 'standard_name' : 'directional_spectrum'})})
     # Estimate integrated parameters
     ds['Hm0'] = (4*(SPEC2D.integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum')
-    ds['Hs'] = (4*np.std(raw_data.heave,axis=1)).assign_attrs(units='m', standard_name = 'significant_wave_height_from_heave')
+    ds['Hs'] = (4*np.std(Z,axis=1)).assign_attrs(units='m', standard_name = 'significant_wave_height_from_heave')
     fp = SPEC2D.integrate('direction').idxmax(dim='frequency')
     ds['Tp'] = (1/fp).assign_attrs(units='s', standard_name = 'peak_wave_period')
-    
+
     if direction_units == 'rad':
         pdir = np.rad2deg(SPEC2D.integrate('frequency').idxmax(dim='direction'))
     elif direction_units == 'deg':
@@ -323,7 +328,7 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     # m0 = ds['h_SPEC'].integrate('frequency')
     # m1 = (ds['frequency']*ds['h_SPEC']).integrate('frequency')
     # m2 = (ds['frequency']*ds['frequency']*ds['h_SPEC']).integrate('frequency')
-    
+
     # ds['kurtosis'] = ((Z**4).mean('samples')/((Z**2).mean('samples'))**2) -1  # degree of peakedness
     # ds['skewness'] = ((Z**3).mean('samples')/((Z**2).mean('samples'))**(3/2))  # degree of asymmetry
     # ds['spec_width'] = (((m0*m2/(m1**2)) - 1)**0.5).assign_attrs(standard_name = 'spectral_width')
@@ -341,32 +346,39 @@ def Spectral_Partition(ds, beta):
         ds['Hm0_'+part[k]] = (4*(ds['SPEC_'+part[k]].integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum_'+part[k])
         ds['Tp_'+part[k]] = (1/ds['SPEC_'+part[k]].integrate('direction').idxmax(dim='frequency')).assign_attrs(units='s', standard_name = 'peak_wave_period_'+part[k])
         ds['pdir_'+part[k]] = np.rad2deg(ds['SPEC_'+part[k]].integrate('frequency').idxmax(dim='direction'))
-   
+
     return ds
 
 
-def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_units, add_par,add_h_Spec, fig_format):
+def plot_Directional_Spectra(ds,plot_type,vmin, vmax,cmap,  filter_factor, fig_title, SPEC_units, add_par,add_h_Spec,log_scale, fig_format):
     """
     Plot Directional Spectra[frequency, direction] in polar coordinates
     SPEC: xarray with coordinates frequency in Hz and direction in degrees (nautical convection)
     fig_title: title string format
     fig_format: format of the figure e.g., png, pdf, eps
-    """    
+    """
     if SPEC_units == 'm²/Hz/deg':
         theta = np.deg2rad(ds.SPEC['direction'])
     else:
         theta = ds.SPEC['direction']
- 
-    
+
+
     SPEC = ds.SPEC.where(ds.SPEC>ds.SPEC.max()*filter_factor,np.nan) # set to nan values < SPEC.max()*filter_factor
     fig = plt.figure(figsize=(7,5))
     ax = plt.subplot(111, polar=True)
     ax.set_theta_direction(-1)
     ax.set_theta_zero_location("N")
     if plot_type == 'pcolormesh':
-        cs = ax.pcolormesh(theta, SPEC['frequency'], SPEC,cmap=cmap ,shading='auto', norm=colors.LogNorm())
+        if log_scale == True:
+            cs = ax.pcolormesh(theta, SPEC['frequency'], SPEC,vmin=vmin,vmax=vmax, cmap=cmap ,shading='auto', norm=colors.LogNorm())
+        else:
+            cs = ax.pcolormesh(theta, SPEC['frequency'], SPEC,vmin=vmin,vmax=vmax, cmap=cmap ,shading='auto')
     elif plot_type == 'contourf':
-        cs = ax.contourf(theta, SPEC['frequency'], SPEC,cmap=cmap,norm=colors.LogNorm())
+        if log_scale == True:
+            cs = ax.contourf(theta, SPEC['frequency'], SPEC,vmin=vmin,vmax=vmax, cmap=cmap,norm=colors.LogNorm())
+        else:
+            cs = ax.contourf(theta, SPEC['frequency'], SPEC,vmin=vmin,vmax=vmax, cmap=cmap)
+
     ticks_loc = ax.get_xticks().tolist()
     ax.xaxis.set_major_locator(mticker.FixedLocator(ticks_loc))
     ax.set_xticklabels(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'])
@@ -375,19 +387,19 @@ def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_un
 
     # Adding text on the plot.
     if add_par == True:
-        plt.gcf().text(0.01, 0.05, 
-                       '$H_{m0}$:'+str(ds.Hm0.values.round(1))+' m' +'\n'+ 
+        plt.gcf().text(0.01, 0.05,
+                       '$H_{m0}$:'+str(ds.Hm0.values.round(1))+' m' +'\n'+
                        '$T_{p}$:'+str(ds.Tp.values.round(1))+' s'+'\n'+
                        '$\u03B8_p$:'+str(ds.pdir.values.round(1))+'$^o$'+'\n'+
                        # '---------------'+'\n'+
-                       # '$H_{m0,swell}$:'+str(ds.Hm0_swell.values.round(1))+' m' +'\n'+ 
+                       # '$H_{m0,swell}$:'+str(ds.Hm0_swell.values.round(1))+' m' +'\n'+
                        # '$T_{p,swell}$:'+str(ds.Tp_swell.values.round(1))+' s'+'\n'+
                        # '$\u03B8_{p,swell}$:'+str(ds.pdir_swell.values.round(1))+'$^o$'+'\n'+
                        # '---------------'+'\n'+
-                       # '$H_{m0,wind}$:'+str(ds.Hm0_windsea.values.round(1))+' m' +'\n'+ 
+                       # '$H_{m0,wind}$:'+str(ds.Hm0_windsea.values.round(1))+' m' +'\n'+
                        # '$T_{p,wind}$:'+str(ds.Tp_windsea.values.round(1))+' s'+'\n'+
                        # '$\u03B8_{p,wind}$:'+str(ds.pdir_windsea.values.round(1))+'$^o$'+'\n'+
-                       '---------------'+'\n'+                      
+                       '---------------'+'\n'+
                        '$U_w$:'+str(ds.WindSpeed.values.round(1))+' $m/s$'+'\n'+
                        '$\u03B8_{w}$:'+str(ds.WindDirection.values.round(1))+'$^o$'+'\n'+
                        '---------------'+'\n'+
@@ -396,7 +408,7 @@ def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_un
                        ,fontsize=14)
     else:
         pass
-    
+
     if add_h_Spec == True:
         plt.axes([.84, .09, .12, .3], facecolor= None)
         ds.h_SPEC.plot()
@@ -405,15 +417,6 @@ def plot_Directional_Spectra(ds,plot_type,cmap,filter_factor, fig_title, SPEC_un
         fig.colorbar(cs,shrink=0.5,orientation='horizontal', label=SPEC_units)
     else:
         fig.colorbar(cs, label=SPEC_units)
-    ax.set_title(fig_title, fontsize=16)   
+    ax.set_title(fig_title, fontsize=16)
     fig.savefig(fig_title+'_2DSPEC.'+fig_format, dpi=300)
     plt.close()
-    
-    
-    
-    
-    
-    
-    
-    
-    

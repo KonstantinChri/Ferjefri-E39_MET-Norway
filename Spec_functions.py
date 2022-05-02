@@ -86,8 +86,8 @@ def Heave_to_WelchSpec1D(heave,freq_resolution,sample_frequency, detrend_str, wi
 
 
     ds = xr.Dataset({'SPEC': xr.DataArray(SPEC,
-                                dims   = ['time','freq'],
-                                coords = {'time': heave.time,'freq':freq},
+                                dims   = ['time','frequency'],
+                                coords = {'time': heave.time,'frequency':freq},
                                 attrs  = {'units': 'm**2 s'})})
     return ds
 
@@ -117,7 +117,7 @@ def Heave_to_Coherence(heave1,heave2,freq_resolution,sample_frequency, detrend_s
                                    axis=-1)
 
     ds = xr.Dataset({'Coh': xr.DataArray(Coh,
-                                dims   = ['time','freq'],
+                                dims   = ['time','frequency'],
                                 coords = {'time': ds0.time,'frequency':freq},
                                 attrs  = {'units': '-'})})
     return ds

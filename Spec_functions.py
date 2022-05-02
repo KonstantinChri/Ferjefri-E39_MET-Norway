@@ -118,7 +118,7 @@ def Heave_to_Coherence(heave1,heave2,freq_resolution,sample_frequency, detrend_s
 
     ds = xr.Dataset({'Coh': xr.DataArray(Coh,
                                 dims   = ['time','freq'],
-                                coords = {'time': ds0.time,'freq':freq},
+                                coords = {'time': ds0.time,'frequency':freq},
                                 attrs  = {'units': '-'})})
     return ds
 
@@ -370,12 +370,12 @@ def plot_Directional_Spectra(ds,plot_type,vmin, vmax,cmap,  filter_factor, fig_t
     ax.set_theta_zero_location("N")
     if plot_type == 'pcolormesh':
         if log_scale == True:
-            cs = ax.pcolormesh(theta, SPEC['frequency'], SPEC,vmin=vmin,vmax=vmax, cmap=cmap ,shading='auto', norm=colors.LogNorm())
+            cs = ax.pcolormesh(theta, SPEC['frequency'], SPEC, cmap=cmap ,shading='auto', norm=colors.LogNorm(vmin=vmin,vmax=vmax))
         else:
             cs = ax.pcolormesh(theta, SPEC['frequency'], SPEC,vmin=vmin,vmax=vmax, cmap=cmap ,shading='auto')
     elif plot_type == 'contourf':
         if log_scale == True:
-            cs = ax.contourf(theta, SPEC['frequency'], SPEC,vmin=vmin,vmax=vmax, cmap=cmap,norm=colors.LogNorm())
+            cs = ax.contourf(theta, SPEC['frequency'], SPEC, cmap=cmap, norm=colors.LogNorm(vmin=vmin,vmax=vmax))
         else:
             cs = ax.contourf(theta, SPEC['frequency'], SPEC,vmin=vmin,vmax=vmax, cmap=cmap)
 

@@ -335,9 +335,11 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
     return ds
 
 
-def Spectral_Partition(ds, beta):
-    ds['cp'] = 9.81/(2*np.pi*ds['frequency'])
-    ds['A']  = beta*(ds['WindSpeed']/ds['cp'])*np.cos(ds['direction']-np.rad2deg(ds['WindDirection']))
+def Spectral_Partition_wind(ds, beta):
+    #Based on the formulation by Komen et al. (1984)
+    #beta ≤ 1.3 to identify pure wind sea (Hasselmann et al. 1996; Voorrips et al. 1997; Bidlot 2001)
+    ds['cp'] = 9.81/(2*np.pi*ds['frequency']) # phase speed
+    ds['A']  = beta*(ds['WindSpeed']/ds['cp'])*np.cos(ds['direction']-np.deg2rad(ds['WindDirection']))
     ds['SPEC_swell'] = ds['SPEC'].where(ds['A']<=1,0)
     ds['SPEC_windsea'] = ds['SPEC'].where(ds['A']>1,0)
     # Estimate integrated parameters
@@ -349,6 +351,20 @@ def Spectral_Partition(ds, beta):
 
     return ds
 
+def Spectral_Partition_freq(ds, freq_lim = 0.15):
+    #Spectral partition function based on a frequency limit in Hz
+    ds['SPEC_swell']   = ds['SPEC'].where(ds['frequency']<freq_lim)
+    ds['SPEC_swell']  = ds['SPEC_swell'].fillna(0)
+    ds['SPEC_windsea'] = ds['SPEC'].where(ds['frequency']>=freq_lim)
+    ds['SPEC_windsea']  = ds['SPEC_windsea'].fillna(0)
+    # Estimate integrated parameters
+    part = ['swell','windsea']
+    for k in range(len(part)):
+        ds['Hm0_'+part[k]] = (4*(ds['SPEC_'+part[k]].integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum_'+part[k])
+        ds['Tp_'+part[k]] = (1/ds['SPEC_'+part[k]].integrate('direction').idxmax(dim='frequency')).assign_attrs(units='s', standard_name = 'peak_wave_period_'+part[k])
+        ds['pdir_'+part[k]] = np.rad2deg(ds['SPEC_'+part[k]].integrate('frequency').idxmax(dim='direction'))
+
+    return ds
 
 def plot_Directional_Spectra(ds,plot_type,vmin, vmax,cmap,  filter_factor, fig_title, SPEC_units, add_par,add_h_Spec,log_scale, fig_format):
     """

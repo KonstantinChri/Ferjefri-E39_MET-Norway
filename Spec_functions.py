@@ -338,17 +338,33 @@ def Directional_Spectra(raw_data, freq_resolution, n_direction , sample_frequenc
 def Spectral_Partition_wind(ds, beta):
     #Based on the formulation by Komen et al. (1984)
     #beta ≤ 1.3 to identify pure wind sea (Hasselmann et al. 1996; Voorrips et al. 1997; Bidlot 2001)
+
+    # Calculate the phase speed (cp) using the dispersion relation for deep water waves
     ds['cp'] = 9.81/(2*np.pi*ds['frequency']) # phase speed
-    ds['A']  = beta*(ds['WindSpeed']/ds['cp'])*np.cos(ds['direction']-np.deg2rad(ds['WindDirection']))
+    
+    # Initialize an array to store the directional difference between wave direction and wind direction
+    ds['diff_dir'] = xr.DataArray(np.zeros((ds.time.size, ds.direction.size)), 
+                            dims=['time', 'direction'],
+                            coords={'time': ds.time, 'direction': ds.direction})
+
+    # Loop over each time step to compute the angular difference between wave direction and wind direction
+    for i in range (len(ds['diff_dir'].time)):
+        ds['diff_dir'][i,:] = angular_difference(np.rad2deg(ds.direction), ds['WindDirection'][i].item())
+
+    # Calculate the dimensionless parameter A, which is used to distinguish between swell and windsea
+    ds['A']  = beta*(ds['WindSpeed']/ds['cp'])*np.cos(np.deg2rad(ds['diff_dir']))
+
+    # Partition the wave spectrum into swell and windsea components based on the value of A
     ds['SPEC_swell'] = ds['SPEC'].where(ds['A']<=1,0)
     ds['SPEC_windsea'] = ds['SPEC'].where(ds['A']>1,0)
+
     # Estimate integrated parameters
     part = ['swell','windsea']
     for k in range(len(part)):
         ds['Hm0_'+part[k]] = (4*(ds['SPEC_'+part[k]].integrate("frequency").integrate("direction"))**0.5).assign_attrs(units='m', standard_name = 'significant_wave_height_from_spectrum_'+part[k])
         ds['Tp_'+part[k]] = (1/ds['SPEC_'+part[k]].integrate('direction').idxmax(dim='frequency')).assign_attrs(units='s', standard_name = 'peak_wave_period_'+part[k])
         ds['pdir_'+part[k]] = np.rad2deg(ds['SPEC_'+part[k]].integrate('frequency').idxmax(dim='direction'))
-
+    
     return ds
 
 def Spectral_Partition_freq(ds, freq_lim = 0.15):
@@ -436,3 +452,31 @@ def plot_Directional_Spectra(ds,plot_type,vmin, vmax,cmap,  filter_factor, fig_t
     ax.set_title(fig_title, fontsize=16)
     fig.savefig(fig_title+'_2DSPEC.'+fig_format, dpi=300)
     plt.close()
+
+
+
+def angular_difference(deg1, deg2):
+    """
+    Calculate the smallest difference between two angles in degrees.
+    
+    Parameters:
+    deg1 (float or array-like): The first angle(s) in degrees.
+    deg2 (float or array-like): The second angle(s) in degrees.
+    
+    Returns:
+    float or np.ndarray: The smallest difference(s) between the two angles in degrees.
+    """
+    # Convert inputs to numpy arrays for element-wise operations
+    deg1 = np.asarray(deg1)
+    deg2 = np.asarray(deg2)
+    
+    # Calculate the absolute difference
+    diff = np.abs(deg1 - deg2)
+    
+    # Normalize the difference to the range [0, 360)
+    diff = diff % 360
+    
+    # Adjust if the difference is greater than 180 to get the shortest path
+    diff = np.where(diff > 180, 360 - diff, diff)
+    
+    return diff
